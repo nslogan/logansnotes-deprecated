@@ -1,0 +1,48 @@
+<div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&quot;task.hpp&quot;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&quot;bitops.h&quot;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;avr/interrupt.h&gt;</span><span class="cp"></span>
+
+<span class="k">namespace</span> <span class="n">task</span> <span class="p">{</span>
+
+<span class="k">static</span> <span class="k">volatile</span> <span class="kt">uint8_t</span> <span class="n">task_prd_ctr_g</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="c1">// Counter used to control task period</span>
+<span class="k">static</span> <span class="k">volatile</span> <span class="kt">uint8_t</span> <span class="n">task_exe_flag_g</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="c1">// Flag read by main loop to control task execution</span>
+
+<span class="kt">void</span> <span class="nf">_timer1_compa_isr</span><span class="p">()</span>
+<span class="p">{</span>
+	<span class="c1">// Task counter</span>
+	<span class="o">++</span><span class="n">task_prd_ctr_g</span><span class="p">;</span>
+	<span class="k">if</span> <span class="p">(</span> <span class="n">task_prd_ctr_g</span> <span class="o">&gt;=</span> <span class="n">TASK_PRD_COUNT</span> <span class="p">)</span> <span class="p">{</span>
+		<span class="n">task_prd_ctr_g</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+		<span class="n">task_exe_flag_g</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span> <span class="nf">Init</span><span class="p">(</span> <span class="n">DataStore</span> <span class="o">&amp;</span><span class="n">ds</span> <span class="p">)</span>
+<span class="p">{</span>
+	<span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">ds</span><span class="p">;</span>
+
+	<span class="c1">// Configure timer/counter1, channel A as SysTick (1 ms)</span>
+	<span class="c1">// WGM1[3:0] = 0x04; CTC, TOP = OCR1A</span>
+	<span class="n">TCCR1B</span> <span class="o">=</span>  <span class="n">HBIT</span><span class="p">(</span><span class="n">WGM12</span><span class="p">)</span> <span class="o">|</span> <span class="n">HBIT</span><span class="p">(</span><span class="n">CS10</span><span class="p">);</span> <span class="c1">// clk_io / 1 (no prescaler)</span>
+	<span class="n">OCR1A</span> <span class="o">=</span> <span class="mi">15999</span><span class="p">;</span> <span class="c1">// 16 MHz / 1, count to 16000 = 1 kHz</span>
+	<span class="n">TIMSK1</span> <span class="o">=</span> <span class="n">HBIT</span><span class="p">(</span><span class="n">OCIE1A</span><span class="p">);</span> <span class="c1">// Output Compare A Match Interrupt Enable</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span> <span class="nf">CheckFlag</span><span class="p">(</span> <span class="n">DataStore</span> <span class="o">&amp;</span><span class="n">ds</span> <span class="p">)</span>
+<span class="p">{</span>
+	<span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">ds</span><span class="p">;</span>
+	
+	<span class="k">if</span> <span class="p">(</span> <span class="o">!</span> <span class="n">task_exe_flag_g</span> <span class="p">)</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+	<span class="p">}</span>
+
+	<span class="n">cli</span><span class="p">();</span>
+	<span class="n">task_exe_flag_g</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+	<span class="n">sei</span><span class="p">();</span>
+
+	<span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="p">}</span> <span class="c1">// namespace task</span>
+</pre></div>
