@@ -111,7 +111,47 @@ I enabled `CMD_USB_MASS_STORAGE` in menuconfig (which enables the appropriate US
 
 It was successful! I loaded the Auterion image over UMS like I have in the past and it booted!
 
-I then modified the device tree for Linux to enable 8-bit eMMC mode (CHANGES TO BE DOCUMENTED BELOW).
+I then modified the device tree for Linux to enable 8-bit eMMC mode. I copied the definitions of the existing MMC pins and had to add the pinctrl definitions for the MMC data lines 4 through 7 (putting them in `MUX_MODE3`). [Here's](https://android.googlesource.com/kernel/goldfish/+/android-3.18/Documentation/devicetree/bindings/mmc/mmci.txt) the ARM PrimeCell MMCI PL180 device tree binding documentation. To calculate the address for data lines 4 through 7 I first referenced [this](https://jumpnowtek.com/beaglebone/BeagleBone-Black-pinmuxing-and-other-device-tree-notes.html) site which showed a few examples of calculating these values but was somewhat out of date with regards to AM335x TRM sections - I did, however, find the correct sections and calculate the offsets properly.
+
+```devicetree
+&am33xx_pinmux {
+	emmc_pins: pinmux_emmc_pins {
+		pinctrl-single,pins = <
+			AM33XX_IOPAD(0x960, PIN_INPUT | MUX_MODE7)		/* spio0_cs1.gpio0_6 */
+			AM33XX_IOPAD(0x904, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_cmd.mmc0_cmd */
+			AM33XX_IOPAD(0x900, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_clk.mmc0_clk */
+			AM33XX_IOPAD(0x8fc, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat0.mmc0_dat0 */
+			AM33XX_IOPAD(0x8f8, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat1.mmc0_dat1 */
+			AM33XX_IOPAD(0x8f4, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat2.mmc0_dat2 */
+			AM33XX_IOPAD(0x8f0, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc0_dat3.mmc0_dat3 */
+
+			AM33XX_IOPAD(0x938, PIN_INPUT_PULLUP | MUX_MODE3)	/* mmc0_dat4.mmc0_dat4 */
+			AM33XX_IOPAD(0x934, PIN_INPUT_PULLUP | MUX_MODE3)	/* mmc0_dat5.mmc0_dat5 */
+			AM33XX_IOPAD(0x930, PIN_INPUT_PULLUP | MUX_MODE3)	/* mmc0_dat6.mmc0_dat6 */
+			AM33XX_IOPAD(0x92C, PIN_INPUT_PULLUP | MUX_MODE3)	/* mmc0_dat7.mmc0_dat7 */
+		>;
+	};
+};
+
+&mmc1 {
+	status = "okay";
+	vmmc-supply = <&vmmcsd_fixed>;
+	bus-width = <8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&emmc_pins>;
+	/delete-property/ cd-gpios;
+	// cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+};
+
+// N16  L16  MII1_RXD2    mmc0_dat4 (3)  conf_mii1_rxd2    938h
+// N17  L17  MII1_RXD3    mmc0_dat5 (3)  conf_mii1_rxd3    934h
+// M19  L18  MII1_RX_CLK  mmc0_dat6 (3)  conf_mii1_rx_clk  930h
+// N19  K18  MII1_TX_CLK  mmc0_dat7 (3)  conf_mii1_tx_clk  92Ch
+```
+
+Note the use of `/delete-property/` which I use to remove the defined node `cd-gpios` which is the "card detect" (cd) GPIOs and is not needed for mmc1 anymore since it is eMMC (and thus not removable). I found this feature on [Device Tree Source Undocumented](https://elinux.org/Device_Tree_Source_Undocumented#Deleting_nodes_and_properties).
+
+I confirmed in the booted Linux image that the eMMC was in 8-bit mode by running `cat /sys/kernel/debug/mmc0/ios` and looking at the line `bus width: 3 (8 bits)`.
 
 ## Scripting Bring-up
 

@@ -1,6 +1,4 @@
 
-## XPS13
-
 ### Register Class
 
 I've been dreaming of a "register" class implementation for a long time. The magic of templates, C++ classes, and embedded - wonderful.
@@ -118,13 +116,29 @@ The [u-boot overview](https://wiki.st.com/stm32mpu/wiki/U-Boot_overview) on STs 
 
 It's useful to know that you can script stuff to u-boot with Kermit. [Here's an example](https://www.emcraft.com/stm32f429discovery/loading-linux-images-over-uart) of a script that configures Kermit and loads an image using `loadb`.
 
+[Debugging u-boot](https://www.denx.de/wiki/view/DULG/DebuggingUBoot) provides tips on how to debug u-boot before and *after* relocation. Post-relocation boils down to:
+
+```
+# You need to know where u-boot relocates it self to. Figure that address out through some means (some suggestions are provided in that link).
+
+(gdb) symbol-file
+Discard symbol table from `/home/dzu/denx/cvs-trees/u-boot/u-boot'? (y or n) y
+No symbol file now.
+(gdb) add-symbol-file u-boot <relocation-address>
+add symbol table from file "u-boot" at
+        .text_addr = <relocation-address>
+(y or n) y
+Reading symbols from u-boot...done.
+```
+
+[Here's](https://wiki.st.com/stm32mpu/wiki/U-Boot_-_How_to_debug) another take on debugging u-boot from the STM32 MPU Wiki.
+
 #### AM335x u-boot
 
 I want to get [Netboot](https://github.com/LeMaker/u-boot/blob/master/doc/SPL/README.am335x-network) working so I can do TFTP boot in SPL.
 
 - [TI: AM335x board bringup tips](http://processors.wiki.ti.com/index.php/AM335x_board_bringup_tips)
 - [TI: AM335x U-Boot User's Guide](http://processors.wiki.ti.com/index.php/AM335x_U-Boot_User%27s_Guide#Boot_Over_UART)
-- 
 
 ### STM32 Bare Metal
 
@@ -160,6 +174,8 @@ $ st-flash --reset read flysky_fsi6s_dump_stlink.bin 0x8000000 0x20000
 
 $ st-flash write bin/blink.bin 0x8000000
 ```
+
+The file [`<px4-firmware>/boards/px4/fmu-v5/nuttx-config/scripts/script.ld`](https://github.com/PX4/Firmware/blob/master/boards/px4/fmu-v5/nuttx-config/scripts/script.ld) is a very well documented linker script for the STM32F7.
 
 #### Helpful GCC options
 
@@ -207,11 +223,151 @@ $ arm-linux-gnueabihf-gdb
 (gdb) tar ext :4242
 ```
 
+[Here's](https://gitlab.incom.co/CM-Shield/u-boot/commit/e66c49fa930ed002c507ae0217b4b274c25675fb) the patch that "stm32: add support for stm32f7 & stm32f746 discovery board"
 [Here's](https://patchwork.ozlabs.org/patch/764135/) a patch to u-boot that supports XIP for the STM32F746 Discovery board.
 
 [STM32F75xxx and STM32F7xxx Reference Manual](https://www.st.com/content/ccc/resource/technical/document/reference_manual/c5/cf/ef/52/c0/f1/4b/fa/DM00124865.pdf/files/DM00124865.pdf/jcr:content/translations/en.DM00124865.pdf)
 
 I used the TRM to determine the memory boundaries of SRAM on the STM32F746 which told me that I was putting my stack in the wrong spot on the STM32F765 (SRAM2 ends at 0x20050000 on the 46).
+
+#### PixHawk4 u-boot (STM32F765)
+
+I got u-boot mostly working on the PixHawk4 in a very basic sense. I can boot SPL or u-boot proper. It still does relocation but I am going to disable that (since I have a lot of ROM and much less RAM). However, I haven't been able to get the MMC to work. Here's the current status (with a lot of debug messages enabled):
+
+```
+=> mmc info
+sdio1@40012c00: No vqmmc supply
+clock is disabled (0Hz)
+Error disabling VMMC supply
+Unable to do a full power cycle. Disabling the UHS modes for safety
+selecting mode MMC legacy (freq : 0 MHz)
+clock is enabled (122487Hz)
+CMD_SEND:0
+		ARG			 0x00000000
+		MMC_RSP_NONE
+CMD_SEND:8
+		ARG			 0x000001aa
+CMD8 time out
+		RET			 -110
+CMD_SEND:55
+		ARG			 0x00000000
+CMD55 time out
+		RET			 -110
+CMD_SEND:0
+		ARG			 0x00000000
+		MMC_RSP_NONE
+CMD_SEND:1
+		ARG			 0x00000000
+CMD1 time out
+		RET			 -110
+Card did not respond to voltage select!
+mmc_init: -95, time 66
+=>
+```
+
+What I know:
+
+- I had to enable the 3V power for the MMC slot - there's a separate regulator that powers a number of devices on the PixHawk4.
+	+ In the file [`<px4-firmware>/boards/px4/fmu-v5/src/init.c`](https://github.com/PX4/Firmware/blob/bf0eaf4d546663c7c71bf55d49bcce4c6db1658d/boards/px4/fmu-v5/src/init.c) is the function `board_app_initialize` which calls `VDD_3V3_SD_CARD_EN(true)`
+	+ In the file [`<px4-firmware>/boards/px4/fmu-v5/src/board_config.h`](https://github.com/PX4/Firmware/blob/f613581b701700d2abea1caf132ec17788ce0bed/boards/px4/fmu-v5/src/board_config.h) is the macro `GPIO_VDD_3V3_SD_CARD_EN` which defines the IO settings (e.g. `GPIO_OUTPUT`) and has a comment calling out "PG7" as the pin used
+- My device tree for MMC matches the STM32F746-disco which *is* working
+- The pinmux entries in my mmc node are not being probed - the pinux is set to default values - **I suspect this is the core issue** (you can see this with `pinmux status -a` and the GPIOs for MMC are `gpio input`)
+- I don't know *why* the pinmux entires aren't being run - it's possible I'm running out of RAM
+
+Here are some steps to perform:
+
+- Disable relocation
+- Confirm board configuration for memory boundaries
+- Get a hold on memory usage - how much stack do I actually need
+- Understand the "environment" concept in u-boot
+- Get a handle on the actual Kconfig needed for PixHawk4
+- Maybe try starting back at a fresh version of u-boot based on the STM32F746-disco and apply my fixes
+
+It might also be useful to review [U-Boot bootloader port done right - 2017 edition](https://elinux.org/images/5/52/Jamboree-63-2017.pdf) and see if I can find the actual recorded talk.
+
+The file [`<px4-firmware>/boards/px4/fmu-v5/src/board_config.h`](https://github.com/PX4/Firmware/blob/48df19c8dfa145a16278b48e2aff0a4eda74feda/boards/px4/fmu-v5/src/board_config.h) is very useful for quickly referencing hardware definitions for the PixHawk4. There's also a spreadsheet of the STM32F7 I/O assignments.
+
+##### Dronecode Probe
+
+The dronecode probe is a blackmagic probe in a different shape with different connectors that make it easier to connect to the PixHawk4 and other autopilot targets.
+
+It probably came with the wrong version of blackmagic firmware on it. Upgrading it is pretty easy - you power it on while holding the "boot" button and then execute a script:
+
+```bash
+logan@pop-os:~/src/blackmagic/scripts$ sudo python stm32_mem.py ~/Downloads/blackmagic.bin
+
+USB Device Firmware Upgrade - Host Utility -- version 1.2
+Copyright (C) 2011  Black Sphere Technologies
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+
+Device ID:	 1d50:6017
+Manufacturer:	 Black Sphere Technologies
+Product:	 Black Magic Probe (Upgrade)
+Serial:		 7DBD9ACD
+Programming memory at 0x08018000
+All operations complete!
+
+```
+
+##### Sublime Session
+
+Open files:
+
+- `doc/port-u-boot-to-pixhawk4.md`
+- `include/configs/stm32f765-pixhawk4.h`
+	+ I was last experimenting with `CONFIG_BOARD_LATE_INIT` and the matching function `board_late_init` in `stm32f765-pixhawk4.c` to manually configure the MMC GPIOs into `GPIO_AF12` but I don't think that actually worked. I am going to commit the changes in this repo to a separate branched named `tmp-mmc-dev`
+- `board/st/stm32f765-pixhawk4/stm32f765-pixhawk4.c`
+	+ I definitely don't have all of my functions wrapped in the proper config option entires (like `#ifdef CONFIG_BOARD_LATE_INIT`)
+	+ Also a lot of code cleanup and organization to do
+
+- `board/st/stm32f746-disco/stm32f746-disco.c`
+- `include/configs/stm32f746-disco.h`
+
+- `board/synopsys/iot_devkit/iot_devkit.c`
+	+ I had this file open because it's a good example of a non-relocating u-boot target. The function `mach_cpu_init` adds the flag `GD_FLG_SKIP_RELOC` to the global data structure, copies data from ROM to RAM, and sets up some hardware.
+	+ Based on [this talk](https://events.linuxfoundation.org/wp-content/uploads/2017/12/U-Boot-Bootloader-for-IoT-Platform-Alexey-Brodkin-Synopsys-3.pdf) which is super helpful for understanding non-relocating u-boot. [Here's](https://gitlab.denx.de/u-boot/u-boot/commit/264d298fda39) the commit that added this feature.
+
+- `common/board_r.c`
+- `common/board_f.c`
+- `common/board_f.i`
+	+ This is `common/board_f.c` after pre-processing (command: `make ARCH=arm CROSS_COMPILE=arm-none-eabi- common/board_f.i KCPPFLAGS=-P`) which makes it much easier to see what functions actually end up in the `init_sequence_f` array of function pointers
+
+- `README`
+	+ "Board Initialisation Flow" is what I was most interested at the time
+- `doc/README.arm-relocation`
+	+ Unclear how use it is - explains how ARM relocation is supposed to work
+- `doc/driver-model/design.rst`
+
+- `arch/arm/dts/Makefile`
+	+ `dtb-$(CONFIG_STM32F7)` is a list of device tree binaries to build; I've found that the organization of the STM32F7 targets is not quite what I want (requires some devices I don't need) and so I'll need to consider how to modify that.
+- `arch/arm/mach-stm32/Kconfig`
+	+ `config STM32F7` is the most relevant. I question whether all of the configs defined in here are actually universally applicable to all STM32F7 targets.
+
+- `arch/arm/include/asm/spl.h`
+- `common/spl/spl.c`
+- `arch/arm/lib/spl.c`
+- `include/spl.h`
+	+ Contains enum that defines different boot devices - e.g. `BOOT_DEVICE_MMC1` and `BOOT_DEVICE_UART` which are used in the macro `SPL_LOAD_IMAGE_METHOD` to assign the `boot_device` field in a linker list (see `include/linker_lists.h`) 
+	+ Contains prototype for externally defined linker symbols `__bss_start` and `__bss_end`
+
+- `drivers/core/device.c`
+	+ I was digging through `device_probe` looking for pinctrl-related code. There is a conditional that calls `pinctrl_select_state` which is what is *supposed* to handle the pinctrl entires in a node during the probe process. This doesn't seem to be happening for the PixHawk4 target.
+
+- `drivers/serial/serial-uclass.c`
+- `drivers/serial/serial_stm32.c`
+- `drivers/serial/serial_stm32.h`
+
+- `include/dm/pinctrl.h`
+- `drivers/pinctrl/pinctrl-uclass.c`
+- `drivers/pinctrl/pinctrl_stm32.c`
+
+- `drivers/mmc/mmc.c`
+- `drivers/mmc/omap_hsmmc.c`
+- `drivers/mmc/arm_pl180_mmci.c`
+
+- `drivers/power/regulator/regulator-uclass.c`
+- `drivers/power/regulator/fixed.c`
+- `drivers/power/regulator/gpio-regulator.c`
 
 ### GCC Internals
 
@@ -360,6 +516,34 @@ I think my general idea was to try generating Ninja files with Python. I know yo
 
 The kernel build system
 
+Reading u-boot (and probably kernel) source code effectively
+
+There are just a shitload of preprocessor directives to handle how flexible everything needs to be. While this makes it easy to port to different architectures and boards it also makes the source hard to read and adds to the cognitive load of the programmer who now needs to remember what config options are set.
+
+You can get the preprocessed output of a source file by replacing `*.c` with `*.i` in a `make` invocation.
+
+```bash
+$ make ARCH=<arch> CROSS_COMPILE=<target> <source-file>.i
+```
+
+You can also pass flags to this by using the `KCPPFLAGS` variable. This is useful if you want to remove the generated linemarkers with the `-P` option.
+
+```bash
+$ make ARCH=<arch> CROSS_COMPILE=<target> <source-file>.i KCPPFLAGS=-P
+```
+
+The Kbuild system also supports additional user flags `KAFLAGS` and `KCFLAGS`.
+
+```makefile
+#### <u-boot-src>/Makefile
+# Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
+KBUILD_CPPFLAGS += $(KCPPFLAGS)
+KBUILD_AFLAGS += $(KAFLAGS)
+KBUILD_CFLAGS += $(KCFLAGS)
+```
+
+[Documentation/kbuild/makefiles.txt](https://www.kernel.org/doc/Documentation/kbuild/makefiles.txt) describes the Linux kernel Makefiles.
+
 ### Kconfig
 
 The kernel configuration system
@@ -408,10 +592,12 @@ Tabs:
 - [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) - Super useful, what `linenoise.c` is based on
 - [github: linenoise.c](https://github.com/npat-efault/picocom/blob/master/linenoise-1.0/linenoise.c)
 - [VT100 escape codes](https://www.csie.ntu.edu.tw/~r92094/c++/VT100.html)
+- [Wikipedia: ANSI escape code](https://en.wikipedia.org/wiki/ANSI_escape_code)
 
 ### Linux Usage
 
 - [Dotfiles documentation on GitHub](https://dotfiles.github.io/) - I want to start source controlling my Linux configuration so I can argue with people at bars about vim vs emacs, bash vs zsh, and other pointless things.
+- [thefuck](https://github.com/nvbn/thefuck) is a glorious command I'd like to install and use
 
 ## Interesting Reading
 
@@ -421,6 +607,7 @@ Tabs:
 
 	This resource is for novice programmers exploring the design of command-line utilities. It is best used as an accompaniment providing useful background while reading the source code of the utility you may be interested in. This is not a user guide -- Please see applicable man pages for instructions on using these utilities.
 
+[Things I Learnt The Hard Way (in 30 Years of Software Development)](https://blog.juliobiason.net/thoughts/things-i-learnt-the-hard-way/)
 
 ## Other tabs already saved
 
@@ -466,7 +653,7 @@ A lot of the information in this document will be ported to my site as that proj
 
 ### Markdown Generation
 
-Right now I'm using [commonmarker](https://github.com/gjtorikian/commonmarker) which is a Ruby wrapper for [libcmark-gfm](https://github.com/github/cmark-gfm), GitHub's fork of the reference parser for CommonMark. However, I don't see any reason to keep using this when there's a Python wrapper that does the same thing - [cmarkgfm](https://github.com/theacodes/cmarkgfm). I haven't tried it out yet but I will and hopefully it's just as easy to use. I don't know Ruby right now and don't plan to learn it for this project. Additionally, a number of other tools I plan to use are Python-base so this would make the pipeline slightly less complicated.
+Right now I'm using [commonmarker](https://github.com/gjtorikian/commonmarker) which is a Ruby wrapper for [libcmark-gfm](https://github.com/github/cmark-gfm), GitHub's fork of the reference parser for CommonMark. However, I don't see any reason to keep using this when there's a Python wrapper that does the same thing - [cmarkgfm](https://github.com/theacodes/cmarkgfm). I haven't tried it out yet but I will and hopefully it's just as easy to use. I don't know Ruby right now and don't plan to learn it for this project. Additionally, a number of other tools I plan to use are Python-base so this would make the pipeline slightly less complicated. [Here's](https://github.com/github/markup) a description of GitHub's markdown rendering pipeline.
 
 #### Syntax Highlighting
 
@@ -602,6 +789,35 @@ And here's my normal prompt. I image I could come up with some regex rules to us
 <span class="ansi1"><span class="ansi32">logan@pop-os</span>:<span class="ansi34">~/Desktop/logansnotes</span></span>$
 ```
 
+### Random
+
+**Q:** How do I transfer a file over a serial link with the most basic command line utilities? (e.g. kermit isn't available)
+
+**A:** [This SO page](https://unix.stackexchange.com/questions/460342/retrieve-file-over-serial-without-kermit-and-lrzsz)
+
+```
+# Host side
+$ cat <file> | base64 > <file>_b64
+$ picocom -b <baud> --send-cmd="cat" <device>
+
+# Remote side
+$ cat > <file>_b64
+
+# Host side
+# Inside picocom:
+# 1. Press <ctrl-a> <ctrl-s>
+# 2. Enter filename <file>_b64
+# 3. Press enter
+
+# Remote side
+# End 'cat' session
+$ cat <file>_b64 | base64 --decode > <fil>
+
+# NOTE: You should probably sha256 the file on both sides to make sure it matches
+```
+
+Magic!
+
 ### Man Pages
 
 #### GDB
@@ -650,6 +866,12 @@ This can be useful during initial debugging of a problem - for example, print al
 
 	Set a limit on how many elements of an array GDB will print. If GDB is printing a large array, it stops printing after it has printed the number of elements set by the set print elements command. This limit also applies to the display of strings. When GDB starts, this limit is set to 200. **Setting `<number-of-elements>` to zero means that the printing is unlimited.**
 
+**Q:** How do I access registers in GDB on an ARM device? I get errors related to the memory being out of bounds.
+
+**A:** `set mem inaccessible-by-default off` - This will allow you to access regions not explicitly defined ([source](https://sourceware.org/gdb/onlinedocs/gdb/Memory-Region-Attributes.html)):
+
+	If on is specified, make GDB treat memory not explicitly described by the memory ranges as non-existent and refuse accesses to such memory. The checks are only performed if there’s at least one memory range defined. If off is specified, make GDB treat the memory not explicitly described by the memory ranges as RAM. The default value is on.
+
 #### git
 
 **Q**: How do I list all local branches without a remote? (motivation: you should delete branches that have been merged / rebased onto master)
@@ -673,4 +895,3 @@ tmp/enable-5v-payload
 tmp/us1-104
 wip/build-framework
 ```
-
