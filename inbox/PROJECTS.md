@@ -33,6 +33,12 @@ I came across the article [D as a C Replacement](https://theartofmachinery.com/2
 
 So, a quick starter project would be to follow the bare metal ARM stuff above and see what I can do (e.g. blink an LED).
 
+### Building Linux Images
+
+- [SO: What are the minimum root file system applications required to fully boot Linux](https://unix.stackexchange.com/questions/136278/what-are-the-minimum-root-filesystem-applications-that-are-required-to-fully-boo)
+- [gist: Build and run minimal Linux / Busybox systems in qemu](https://gist.github.com/chrisdone/02e165a0004be33734ac2334f215380e)
+- [Linux Inside: Process of the Linux kernel building](https://0xax.gitbooks.io/linux-insides/content/Misc/linux-misc-2.html)
+
 ### BBB Mare Metal
 
 - [RISC-V from scratch 2: Hardware layouts, linker scripts, and C runtimes](https://twilco.github.io/riscv-from-scratch/2019/04/27/riscv-from-scratch-2.html) - Reference for another architecture I understand a little better than ARM
@@ -46,6 +52,8 @@ Unclear if this actually works or not - I haven't tried any of it yet. We have t
 I found the file [`openOCD/tcl/target/am335x.cfg`](https://github.com/openrisc/openOCD/blob/master/tcl/target/am335x.cfg) in the openrisc fork of OpenOCD.
 
 I also found some mentions of the AM335x in [`ntfreak/openocd`](https://github.com/ntfreak/openocd/search?utf8=%E2%9C%93&q=am335x&type=).
+
+RTEMS website also has [an article](https://devel.rtems.org/wiki/Debugging/OpenOCD/BeagleBoneBlack) about using OpenOCD with the BBB.
 
 **NOTE**: The blackmagic probe supports [Cortex-A](https://github.com/blacksphere/blackmagic/blob/master/src/target/cortexa.c) but I haven't tried that out.
 
@@ -114,7 +122,7 @@ ARM has extensions for ELF when linking - it's defined in [ELF for the ARM Archi
 ~/Downloads/Build-BBB-Image.md
 ~/Desktop/TFTP-boot-BBB.md
 
-The [u-boot overview](https://wiki.st.com/stm32mpu/wiki/U-Boot_overview) on STs website is actually pretty good.
+The [u-boot overview](https://wiki.st.com/stm32mpu/wiki/U-Boot_overview) on STs website is actually pretty good. There's also [Introduction to u-boot bootloader](https://github.com/e-ale/Slides/blob/master/u-boot/u-boot.pdf) by Marek Vasut, one of the maintainers.
 
 It's useful to know that you can script stuff to u-boot with Kermit. [Here's an example](https://www.emcraft.com/stm32f429discovery/loading-linux-images-over-uart) of a script that configures Kermit and loads an image using `loadb`.
 
@@ -137,10 +145,17 @@ Reading symbols from u-boot...done.
 
 #### AM335x u-boot
 
-I want to get [Netboot](https://github.com/LeMaker/u-boot/blob/master/doc/SPL/README.am335x-network) working so I can do TFTP boot in SPL.
+I want to get [Netboot](https://github.com/LeMaker/u-boot/blob/master/doc/SPL/README.am335x-network) working so I can do TFTP boot in SPL. [This article](https://www.linuxjournal.com/content/handy-u-boot-trick) has a good overview of what net booting is and how it works in u-boot.
 
 - [TI: AM335x board bringup tips](http://processors.wiki.ti.com/index.php/AM335x_board_bringup_tips)
 - [TI: AM335x U-Boot User's Guide](http://processors.wiki.ti.com/index.php/AM335x_U-Boot_User%27s_Guide#Boot_Over_UART)
+- [BBB boot process overview](https://github.com/victronenergy/venus/wiki/bbb-boot-process-overview) is a pretty good high level overview of the boot stages
+
+To get the u-boot build used on the canonical images for the BBB or other Beagle boards you can follow the [build instructions on eewiki](https://www.digikey.com/eewiki/display/linuxonarm/BeagleBone+Black#BeagleBoneBlack-Bootloader:U-Boot). They use patches from the [eewiki/u-boot-patches](https://github.com/eewiki/u-boot-patches) repository.
+
+#### USB Gadget Mass Storage
+
+The [`ums` driver](https://boundarydevices.com/u-boot-usb-mass-storage-gadget/) in u-boot is extremely useful for imaging device memory like inaccessible SD cards or eMMC. It's simple to use on block devices, for example `ums 0 mmc 0`. When the device is connected via USB to a host machine you can use a program like [Etcher](https://www.balena.io/etcher/) to image it as if it was a normal USB mass storage device.
 
 ### STM32 Bare Metal
 
@@ -178,6 +193,11 @@ $ st-flash write bin/blink.bin 0x8000000
 ```
 
 The file [`<px4-firmware>/boards/px4/fmu-v5/nuttx-config/scripts/script.ld`](https://github.com/PX4/Firmware/blob/master/boards/px4/fmu-v5/nuttx-config/scripts/script.ld) is a very well documented linker script for the STM32F7.
+
+#### Toolchain
+
+- I should really take a look at [crosstool-NG](https://crosstool-ng.github.io/)
+- - Thomas Petazzoni has a good talk titled [Anatomy of cross-compilation toolchains](https://elinux.org/images/1/15/Anatomy_of_Cross-Compilation_Toolchains.pdf)
 
 #### Helpful GCC options
 
@@ -285,7 +305,7 @@ Here are some steps to perform:
 - Get a handle on the actual Kconfig needed for PixHawk4
 - Maybe try starting back at a fresh version of u-boot based on the STM32F746-disco and apply my fixes
 
-It might also be useful to review [U-Boot bootloader port done right - 2017 edition](https://elinux.org/images/5/52/Jamboree-63-2017.pdf) and see if I can find the actual recorded talk.
+It might also be useful to review [U-Boot bootloader port done right - 2017 edition](https://elinux.org/images/5/52/Jamboree-63-2017.pdf) and see if I can find the actual recorded talk. There's yet another talk [Porting u-boot and Linux on new ARM boards: a step-by-step guide](https://elinux.org/images/2/2a/Schulz-how-to-support-new-board-u-boot-linux.pdf) by Quentin Schulz at Free Electrons.
 
 The file [`<px4-firmware>/boards/px4/fmu-v5/src/board_config.h`](https://github.com/PX4/Firmware/blob/48df19c8dfa145a16278b48e2aff0a4eda74feda/boards/px4/fmu-v5/src/board_config.h) is very useful for quickly referencing hardware definitions for the PixHawk4. There's also a spreadsheet of the STM32F7 I/O assignments.
 
@@ -316,6 +336,7 @@ All operations complete!
 Open files:
 
 - `doc/port-u-boot-to-pixhawk4.md`
+	+ I initially took a lot of notes about bringing up the PixHawk4 but kind of dropped off on that once I got it mostly working. I need to revisit these and add in what else I had to do to make it work.
 - `include/configs/stm32f765-pixhawk4.h`
 	+ I was last experimenting with `CONFIG_BOARD_LATE_INIT` and the matching function `board_late_init` in `stm32f765-pixhawk4.c` to manually configure the MMC GPIOs into `GPIO_AF12` but I don't think that actually worked. I am going to commit the changes in this repo to a separate branched named `tmp-mmc-dev`
 - `board/st/stm32f765-pixhawk4/stm32f765-pixhawk4.c`
@@ -325,9 +346,14 @@ Open files:
 - `board/st/stm32f746-disco/stm32f746-disco.c`
 - `include/configs/stm32f746-disco.h`
 
+- `arch/arm/lib/relocate.S`
+	+ Common relocation function for ARM u-boot
+
 - `board/synopsys/iot_devkit/iot_devkit.c`
 	+ I had this file open because it's a good example of a non-relocating u-boot target. The function `mach_cpu_init` adds the flag `GD_FLG_SKIP_RELOC` to the global data structure, copies data from ROM to RAM, and sets up some hardware.
 	+ Based on [this talk](https://events.linuxfoundation.org/wp-content/uploads/2017/12/U-Boot-Bootloader-for-IoT-Platform-Alexey-Brodkin-Synopsys-3.pdf) which is super helpful for understanding non-relocating u-boot. [Here's](https://gitlab.denx.de/u-boot/u-boot/commit/264d298fda39) the commit that added this feature.
+- `board/synopsys/iot_devkit/u-boot.lds`
+	+ This is the linker script used by this board - it provides the necessary linker symbols to support *not* relocating u-boot but allowing copying of data from ROM to RAM (e.g. `__ram_start` and `__ram_end`)
 
 - `common/board_r.c`
 - `common/board_f.c`
@@ -339,6 +365,9 @@ Open files:
 - `doc/README.arm-relocation`
 	+ Unclear how use it is - explains how ARM relocation is supposed to work
 - `doc/driver-model/design.rst`
+- `tools/binman/README`
+	+ "Binman reads your board's device tree and finds a node which describes the required image layout. It uses this to work out what to place where. The output file normally contains the device tree, so it is in principle possible to read an image and extract its constituent parts."
+	+ This README has a lot of good information about binary image formats supported by u-boot, how they're used throughout the project, and how to use the binman tool
 
 - `arch/arm/dts/Makefile`
 	+ `dtb-$(CONFIG_STM32F7)` is a list of device tree binaries to build; I've found that the organization of the STM32F7 targets is not quite what I want (requires some devices I don't need) and so I'll need to consider how to modify that.
@@ -351,6 +380,10 @@ Open files:
 - `include/spl.h`
 	+ Contains enum that defines different boot devices - e.g. `BOOT_DEVICE_MMC1` and `BOOT_DEVICE_UART` which are used in the macro `SPL_LOAD_IMAGE_METHOD` to assign the `boot_device` field in a linker list (see `include/linker_lists.h`) 
 	+ Contains prototype for externally defined linker symbols `__bss_start` and `__bss_end`
+- `include/initcall.h`
+	+ The function `initcall_run_list` is used to execute a sequence of function calls (defined in a function pointer array) that perform a majority of the initialization sequence for SPL / u-boot. If you add `#define DEBUG` at the top of this header you can get useful debugging messages from executing this sequence - it will print out the address of the initialization function (which you can back out the matching function from by grep'ing a map file or using GDB) and it will print error numbers if it fails.
+- `include/linux/errno.h`
+	+ Useful for understanding what error occurred when a driver prints an error return value
 
 - `drivers/core/device.c`
 	+ I was digging through `device_probe` looking for pinctrl-related code. There is a conditional that calls `pinctrl_select_state` which is what is *supposed* to handle the pinctrl entires in a node during the probe process. This doesn't seem to be happening for the PixHawk4 target.
@@ -370,6 +403,10 @@ Open files:
 - `drivers/power/regulator/regulator-uclass.c`
 - `drivers/power/regulator/fixed.c`
 - `drivers/power/regulator/gpio-regulator.c`
+
+### Static Device Tree / Driver Model
+
+I've had this idea bouncing around for a while to take advantage of the flexibility of the device tree / driver model concept in u-boot but make everything static / compile-time verifiable. u-boot actually has a concept of this in the "platform data" concept. There's even tooling to convert a device tree to platform data - this is all detailed in `<u-boot>/doc/driver-model/of-plat.rst`.
 
 ### GCC Internals
 
@@ -552,6 +589,8 @@ There's a GitHub project [kbuild_skeleton](https://github.com/masahir0y/kbuild_s
 
 The kernel configuration system
 
+[Documentation: kconfig-language.txt](https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt)
+
 ### Memory Models
 
 Probably the most relevant reading to start with is [Dealing with memory access ordering in complex embedded designs](https://www.embedded.com/print/4437925).
@@ -603,6 +642,13 @@ Tabs:
 - [Dotfiles documentation on GitHub](https://dotfiles.github.io/) - I want to start source controlling my Linux configuration so I can argue with people at bars about vim vs emacs, bash vs zsh, and other pointless things.
 - [thefuck](https://github.com/nvbn/thefuck) is a glorious command I'd like to install and use
 
+#### zsh
+
+Bash replacement
+
+- [What is ZSH and why should you use it instead of bash?](https://www.howtogeek.com/362409/what-is-zsh-and-why-should-you-use-it-instead-of-bash/)
+- [oh my zsh](https://ohmyz.sh/) - zsh framework for managing zsh configuration
+
 ## Interesting Reading
 
 [Decoded GNU coreutils](https://www.maizure.org/projects/decoded-gnu-coreutils/)
@@ -636,9 +682,6 @@ https://en.m.wikipedia.org/wiki/SD_card
 FAT file system
 https://en.m.wikipedia.org/wiki/Design_of_the_FAT_file_system
 https://staff.washington.edu/dittrich/misc/fatgen103.pdf
-
-Porting u-boot
-https://elinux.org/images/2/2a/Schulz-how-to-support-new-board-u-boot-linux.pdf
 
 u-boot driver model
 https://docs.google.com/document/d/1_zZLey1JcYvW9RcuzxbCzipLdfr5SVyWEdh7sHhuAWg/mobilebasic
@@ -899,3 +942,6 @@ tmp/enable-5v-payload
 tmp/us1-104
 wip/build-framework
 ```
+
+- [Numerous undo possibilities in git](https://docs.gitlab.com/ee/topics/git/numerous_undo_possibilities_in_git/)
+- [How to remove local untracked files from the current git branch](https://koukia.ca/how-to-remove-local-untracked-files-from-the-current-git-branch-571c6ce9b6b1)
