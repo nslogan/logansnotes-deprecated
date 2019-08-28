@@ -3,7 +3,9 @@
 
 I've been dreaming of a "register" class implementation for a long time. The magic of templates, C++ classes, and embedded - wonderful.
 
-[Here's](https://stackoverflow.com/questions/28604580/registers-as-template-parameter) a set of SO answers for some inspiration. I've got a lot of partial implementations and thoughts spread across this machine and the System76 one. I need to condense them and make some progress at some point.
+- [Here's](https://stackoverflow.com/questions/28604580/registers-as-template-parameter) a set of SO answers for some inspiration. I've got a lot of partial implementations and thoughts spread across this machine and the System76 one. I need to condense them and make some progress at some point.
+- [Representing and manipulating hardware in standard C and C++](http://www.open-std.org/jtc1/sc22/wg21/docs/ESC_SF_02_465_paper.pdf)
+- [C++ hardware register access redux](https://yogiken.files.wordpress.com/2010/02/c-register-access.pdf) - Awesome review of doing what I want to do (well, close to it)
 
 ### Device Tree
 
@@ -543,6 +545,8 @@ KBUILD_CFLAGS += $(KCFLAGS)
 ```
 
 [Documentation/kbuild/makefiles.txt](https://www.kernel.org/doc/Documentation/kbuild/makefiles.txt) describes the Linux kernel Makefiles.
+
+There's a GitHub project [kbuild_skeleton](https://github.com/masahir0y/kbuild_skeleton) which I want to play with in implementing kbuild on my own project.
 
 ### Kconfig
 
