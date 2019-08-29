@@ -143,6 +143,41 @@ Reading symbols from u-boot...done.
 
 [Here's](https://wiki.st.com/stm32mpu/wiki/U-Boot_-_How_to_debug) another take on debugging u-boot from the STM32 MPU Wiki.
 
+`doc/README.kconfig` details the configuration infrastructure of u-boot, including the differences between Linux's Kconfig.
+
+#### Board Initialization Flow
+
+The section "Board Initialisation Flow" in the main u-boot README contains a moderately detailed initialization flow. However, I think a better way of understanding this will be working through a couple actual examples which is what I'm doing by studying the AM335x and STM32F7 flows.
+
+- `include/init.h` - Prototypes of core initialization functions like `board_init_f` and `mach_cpu_init`
+
+#### Driver Model
+
+- `doc/driver-model/README.txt` - High-level information about the driver model
+
+#### Linking
+
+The linker script, `u-boot.lds`, is generated. Like all build targets, you can see how it's made in the file command file `.u-boot.lds.cmd`.
+
+#### Command Line Interface
+
+- `common/cli_simple.c` - This is the simple command line interface used by default in u-boot
+- `common/cli_hust.c` - This is the more advanced, full featured command line ported from busybox `lash` at some point
+- `common/cli.c`
+- `common/cli_readline.c`
+- `common/console.c`
+
+#### x/y/z Modem
+
+- `common/xyzModem.c` - Used by main u-boot to load images with x/y/z modem
+- `common/spl/spl_ymodem.c` - Used by SPL to load an image with y modem
+
+#### SPL
+
+u-boot README: `doc/README.SPL`
+
+SPL stands for "secondary program loader" which is a minified version of u-boot intended for very resource-limited targets - ones that aren't capable of running full u-boot either at all or initially (some targets use SPL to set up external RAM and load u-boot there). SPL is enabled by `CONFIG_SPL_BUILD`.
+
 #### AM335x u-boot
 
 I want to get [Netboot](https://github.com/LeMaker/u-boot/blob/master/doc/SPL/README.am335x-network) working so I can do TFTP boot in SPL. [This article](https://www.linuxjournal.com/content/handy-u-boot-trick) has a good overview of what net booting is and how it works in u-boot.
@@ -152,6 +187,27 @@ I want to get [Netboot](https://github.com/LeMaker/u-boot/blob/master/doc/SPL/RE
 - [BBB boot process overview](https://github.com/victronenergy/venus/wiki/bbb-boot-process-overview) is a pretty good high level overview of the boot stages
 
 To get the u-boot build used on the canonical images for the BBB or other Beagle boards you can follow the [build instructions on eewiki](https://www.digikey.com/eewiki/display/linuxonarm/BeagleBone+Black#BeagleBoneBlack-Bootloader:U-Boot). They use patches from the [eewiki/u-boot-patches](https://github.com/eewiki/u-boot-patches) repository.
+
+- `board/ti/am335x/README` details the `am335x_evm` build which applies to AM335x GP EVM, EVM SK, BBB, and BBW.
+- `board/ti/am335x/board.h` - Cape EEPROM structure, inline functions that can be used to do feature selects based on board type (e.g. `board_is_pb` returns true if the board EEPROM contains the PocketBeagle identifier)
+	+ The test functions use `board_ti_is` which is prototyped in `board/ti/common/board_detect.h` and defined in `board/ti/common/board_detect.c`. The definition uses the macro `TI_EEPROM_DATA` which aliases the memory address stored in `TI_SRAM_SCRATCH_BOARD_EEPROM_START` (defined in `arch/arm/include/asm/omap_common.h` - you can follow the definition from there) to structure type `ti_common_eeprom`. Basically, `TI_EEPROM_DATA` is a pointer to an SRAM location that the contents of the EEPROM have been stored.
+	+ The actual contents of the EEPROM are read by the function `ti_i2c_eeprom_am_get` which stores them into `TI_EEPROM_DATA`.
+	+ The `ti_i2c_eeprom_am_get` function is called by `do_board_detect` in `board/ti/am335x/board.c`; this function is enabled by setting `CONFIG_TI_I2C_BOARD_DETECT`. `do_board_detect` is called in `early_system_init` in `arch/arm/mach-omap2/am33xx/board.c` (which is also enabled by `CONFIG_TI_I2C_BOARD_DETECT`). Finally, `early_system_init` is called by `arch_cpu_init_dm` which is one of the initialization function entires in `init_sequence_f` in `board_f.c` - this function is called immediately following `initf_dm`. The purpose of `arch_cpu_init_dm` is to "init CPU after driver model is available".
+- `board/ti/am335x/board.c` - Board functions for TI AM335x based boards
+
+##### MLO
+
+This is more a Kbuild thing than a u-boot thing but I'm going to document it here for now since my example is from u-boot. Every file that gets built has a `.<target>.cmd` file created (at least it seems that way). For example, to build the `MLO` file for the AM335x bootloader there is `.MLO.cmd` which contains:
+
+```makefile
+cmd_MLO := ./tools/mkimage -T omapimage -a 0x402F0400 -d spl/u-boot-spl.bin MLO >/dev/null 
+```
+
+Part of this file comes from `scripts/Makefile.spl`, the variable `MKIMAGEFLAGS_MLO`. The MLO target gets added to `ALL-y` in `arch/arm/mach-omap2/config.mk` whenever `CONFIG_TI_SECURE_DEVICE` is not defined.
+
+I had this specific file open because I was interested in how the TI-specific MLO file gets created, what address it loads at, etc. The MLO file is loaded into a specific sector in a FAT partition on the SD card and found by TI's first stage bootloader.
+
+I'm not 100% yet on how the command files get created or called, but [this site](https://opensource.com/article/18/10/kbuild-and-kconfig) seemed to have some good insight - at least somewhere to start.
 
 #### USB Gadget Mass Storage
 
@@ -462,6 +518,14 @@ $ make
 
 The GCC source tree contains [GCC Compiler Collection Internals](https://gcc.gnu.org/onlinedocs/gcc-5.4.0/gccint.pdf) which you can build from the build directory using the PDF makefile option (TODO: document this).
 
+#### Assembly Generation
+
+- `gcc/varasm.c` - Handles generation of all assembler code *except* the instructions of a function (which is handled by the code generated from a machine description), including declarations of variables and their initial values. It also outputs assembler code for constants stored in memory and is responsible for combing constants with the same value.
+- `gcc/final.c` - Final pass of the compiler; look at the RTL code for a function and output assembler code. See file header for longer description.
+- `gcc/output.h` - "Declarations for insn-output.c and other code to write to asm_out_file. These functions are defined in final.c, and varasm.c"
+- `gcc/varpool.c` - "Callgraph handling code"
+- `gcc/defaults.h` - "Definitions of various defaults for tm.h macros"
+
 #### Machine Descriptions
 
 The core of supporting multiple architectures is GCC's "machine description" framework. This is a Lisp-based language with the following purpose:
@@ -480,6 +544,9 @@ GAS assembler for AVR:
 - `~/src/gcc-dev/binutils-2.32/gas/config/tc-avr.h`
 
 I have the file `<build>/gcc/target-hooks-def.h` open which I don't remember exactly how it comes into play - it has a bunch of defines in it that control how GCC does stuff for a target but I don't remember why I looked at it. It's generated by `gcc/genhooks.c`.
+
+- `gcc/config/avr/avr.c` contains subroutines for `<build>/gcc/insn-output.c`, a file generated by the program `genoutput`from the machine description file `gcc/config/avr/avr.md`
+- `gcc/config/avr/avr.h` - "Definitions of target machine for GNU compiler"
 
 ##### Where does the vector table come from?
 
@@ -526,6 +593,69 @@ Which does some important stuff:
 **Q:** What's `@progbits`?
 
 **A:** [`as` `.section` name](https://sourceware.org/binutils/docs-2.24/as/Section.html) - specifically the ELF Version section calls out the use of the *type* argument to contain a constant that defines the type of the section. The `@progbits` section type means that the section contains data.
+
+##### Following the assembly of a simple AVR file
+
+The output is:
+
+```gas
+	.file	"avr.c"
+__SP_H__ = 0x3e
+__SP_L__ = 0x3d
+__SREG__ = 0x3f
+__RAMPZ__ = 0x3b
+__tmp_reg__ = 0
+__zero_reg__ = 1
+	.text
+	.section	.text.startup,"ax",@progbits
+.global	main
+	.type	main, @function
+main:
+/* prologue: function */
+/* frame size = 0 */
+/* stack size = 0 */
+.L__stack_usage = 0
+.L2:
+	lds r24,i
+	ldi r25,lo8(1)
+	add r25,r24
+	sts i,r25
+	sts 198,r24
+	rjmp .L2
+	.size	main, .-main
+	.local	i
+	.comm	i,1,1
+	.ident	"GCC: (GNU) 8.3.0"
+.global __do_clear_bss
+```
+
+I picked `.global	main` as a line to try and find. I found the string `.global` in the AVR config header file.
+
+```c
+// ==== config/avr/avr.h ==== //
+/* Globalizing directive for a label.  */
+#define GLOBAL_ASM_OP ".global\t"
+```
+I then searched for `GLOBAL_ASM_OP` and found it in `varasm.c`.
+
+```c
+// ==== varasm.c:7224 ==== //
+/* Default function to output code that will globalize a label.  A
+   target must define GLOBAL_ASM_OP or provide its own function to
+   globalize a label.  */
+#ifdef GLOBAL_ASM_OP
+void
+default_globalize_label (FILE * stream, const char *name)
+{
+  fputs (GLOBAL_ASM_OP, stream);
+  assemble_name (stream, name);
+  putc ('\n', stream);
+}
+#endif /* GLOBAL_ASM_OP */
+```
+
+
+I set a break on a `default_globalize_label` and found that `name` was set to `main`.
 
 ## Research Topics
 
@@ -590,6 +720,12 @@ There's a GitHub project [kbuild_skeleton](https://github.com/masahir0y/kbuild_s
 The kernel configuration system
 
 [Documentation: kconfig-language.txt](https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt)
+
+There are a number of files generated whenever Kconfig / Kbuild runs:
+
+- `.config`
+- `include/generated/autoconf.h`
+- `include/config/auto.conf`
 
 ### Memory Models
 
