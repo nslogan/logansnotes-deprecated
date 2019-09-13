@@ -7,7 +7,7 @@ from pygments import highlight
 from pygments.lexers.asm import GasLexer
 from pygments.formatters import HtmlFormatter
 
-import mako
+from mako.template import Template
 
 # TODO: (?) Probably want higher level options to this like 'build.py <command> <options>' - I want to be able to spit out the highlight CSS but I only need to do that once for the whole site (pretty sure). The other option is to have a separate file that does the CSS generation.
 
@@ -17,8 +17,12 @@ parser.add_argument('-o,--output', dest='out_file', required=True, help='Output 
 
 args = parser.parse_args()
 
+# Read the markdown document
 with open(args.in_file,'r') as f:
-	html = cmarkgfm.github_flavored_markdown_to_html(f.read())
+	markdown = f.read()
+
+# Convert to HTML
+html = cmarkgfm.github_flavored_markdown_to_html(markdown)
 
 # TODO: Get lexer name from class name and dynamically import the lexer (probably need a name-to-lexer map)
 soup = BeautifulSoup(html,features="html.parser")
@@ -45,7 +49,6 @@ with open('site/css/highlight.css','w') as f:
 	f.write(css)
 
 # Generate page
-from mako.template import Template
 page = Template(filename='tools/templates/main.mako').render(
 	page_title='Test',
 	page_content=str(soup)

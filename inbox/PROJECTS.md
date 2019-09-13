@@ -862,6 +862,8 @@ https://www.tldp.org/HOWTO/Bootdisk-HOWTO/buildroot.html
 
 A lot of the information in this document will be ported to my site as that project gets off the ground. I'm going to start collecting some of it below. SOme of this information will likely exist in multiple places, especially stuff that's on the `man` pages of my site - I will cross-link as necessary.
 
+It should be noted that I'm fully reinventing the wheel here. I'm writing a "static site generator". A good example of this is [Pelican](https://www.fullstackpython.com/static-site-generator.html) ([source](https://github.com/getpelican/pelican)).
+
 ### Markdown Generation
 
 Right now I'm using [commonmarker](https://github.com/gjtorikian/commonmarker) which is a Ruby wrapper for [libcmark-gfm](https://github.com/github/cmark-gfm), GitHub's fork of the reference parser for CommonMark. However, I don't see any reason to keep using this when there's a Python wrapper that does the same thing - [cmarkgfm](https://github.com/theacodes/cmarkgfm). I haven't tried it out yet but I will and hopefully it's just as easy to use. I don't know Ruby right now and don't plan to learn it for this project. Additionally, a number of other tools I plan to use are Python-base so this would make the pipeline slightly less complicated. [Here's](https://github.com/github/markup) a description of GitHub's markdown rendering pipeline.
