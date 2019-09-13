@@ -55,10 +55,15 @@ all: ${tgt_objs}
 
 ${tgtdir}/${tgt_bin}: ${tgtdir}/${tgt_elf} | ${tgtdir}
 
-
 # Markdown build rule
 ${objdir}/%.html : %.md
-	${quiet_ruby}$(strip ${RUBY} tools/build.rb -i $< -o $@)
+	python3 tools/build.py -i $< -o $@
+
+# 	${quiet_ruby}$(strip ${RUBY} tools/build.rb -i $< -o $@)
+
+# TODO: Collect dependencies somehow (?)
+# FIXME: Manual dependencies
+${objdir}/src/avr.html: tools/templates/main.mako
 
 .PHONY: clean
 clean:

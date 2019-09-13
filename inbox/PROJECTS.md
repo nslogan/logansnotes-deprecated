@@ -145,6 +145,21 @@ Reading symbols from u-boot...done.
 
 `doc/README.kconfig` details the configuration infrastructure of u-boot, including the differences between Linux's Kconfig.
 
+#### Config - Kconfig
+
+The macro `CONFIG_IS_ENABLED` has the following comment (`include/linux/kconfig.h`):
+
+```c
+/*
+ * CONFIG_IS_ENABLED(FOO) evaluates to
+ *  1 if CONFIG_SPL_BUILD is undefined and CONFIG_FOO is set to 'y' or 'm',
+ *  1 if CONFIG_SPL_BUILD is defined and CONFIG_SPL_FOO is set to 'y' or 'm',
+ *  0 otherwise.
+ */
+```
+
+Which means that given `CONFIG_OF_CONTROL=y` and `CONFIG_SPL_OF_CONTROL=n` the the statement `CONFIG_IS_ENABLED(OF_CONTROL)` would evaluate to "true" during proper u-boot build and "false" during SPL build.
+
 #### Board Initialization Flow
 
 The section "Board Initialisation Flow" in the main u-boot README contains a moderately detailed initialization flow. However, I think a better way of understanding this will be working through a couple actual examples which is what I'm doing by studying the AM335x and STM32F7 flows.
@@ -778,6 +793,19 @@ Tabs:
 - [Dotfiles documentation on GitHub](https://dotfiles.github.io/) - I want to start source controlling my Linux configuration so I can argue with people at bars about vim vs emacs, bash vs zsh, and other pointless things.
 - [thefuck](https://github.com/nvbn/thefuck) is a glorious command I'd like to install and use
 
+#### Spotify and hidpi
+
+[Resource I used](https://community.spotify.com/t5/Desktop-Linux/Linux-client-barely-usable-on-HiDPI-displays/td-p/1067272)
+
+Basically, add `--force-device-scale-factor=1.5` to the `Exec` line in the desktop file.
+
+```
+$ subl /usr/share/applications/spotify.desktop
+# ... snip ...
+Exec=spotify --force-device-scale-factor=1.5 %U
+# ... snip ...
+```
+
 #### zsh
 
 Bash replacement
@@ -1008,6 +1036,17 @@ $ cat <file>_b64 | base64 --decode > <fil>
 ```
 
 Magic!
+
+### Coffee
+
+From Union Coffee Seattle owner:
+
+	- 40 s bloom with light agitation
+	- Cover pour over device to keep temperature consistent
+	- Use water directly off boil to keep slurry temperature high
+	- Keep volume in cup pretty high to reduce agitation
+	- Consider insulating pour over cup to keep temperature consistent
+	- Targets 10 oz coffee in cup
 
 ### Man Pages
 

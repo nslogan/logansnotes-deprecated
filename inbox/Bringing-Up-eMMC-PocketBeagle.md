@@ -153,6 +153,57 @@ Note the use of `/delete-property/` which I use to remove the defined node `cd-g
 
 I confirmed in the booted Linux image that the eMMC was in 8-bit mode by running `cat /sys/kernel/debug/mmc0/ios` and looking at the line `bus width: 3 (8 bits)`.
 
+### u-boot
+
+Ok, where the f*ck does the device tree in the Beagle family come from?
+
+`CONFIG_OF_BOARD_SETUP=y`
+`CONFIG_OF_BOARD is not set`
+
+board_f.c:init_sequence_f[] contains `fdtdec_setup`
+
+Pre-processed version:
+
+```c
+int fdtdec_setup(void)
+{
+ gd->fdt_blob = board_fdt_blob_setup();
+ gd->fdt_blob = map_sysmem
+  (env_get_ulong("fdtcontroladdr", 16,
+          (unsigned long)map_to_sysmem(gd->fdt_blob)), 0);
+ return fdtdec_prepare_fdt();
+}
+```
+
+```c
+__attribute__((weak)) void *board_fdt_blob_setup(void)
+{
+ void *fdt_blob = ((void *)0);
+ fdt_blob = (ulong *)&_end;
+ return fdt_blob;
+}
+```
+
+`extern char _end[], _init[];`
+
+`8088321c g     O .hash	00000000 _end`
+
+
+```
+clock is enabled (400000Hz)
+mmc: widths [8, 4, 1] modes [MMC legacy, MMC High Speed (26MHz), SD High Speed (50MHz), MMC High Speed (52MHz), MMC DDR52 (52MHz)] 
+host: widths [8, 4, 1] modes [MMC legacy, SD Legacy, MMC High Speed (26MHz), SD High Speed (50MHz), MMC High Speed (52MHz)] 
+clock is enabled (25000000Hz)
+clock is enabled (52000000Hz)
+clock is enabled (52000000Hz)
+```
+
+Turns out you need to modify mux.c in the am335 source tree to support 8-bit eMMC.
+
+There is the pinctrl option `PINCTRL_SINGLE` in the Kconfig for that driver that references the AM335x being an example device but it's not in use. Not sure how to start experimenting with that but it could be useful.
+
+I'm going to create a custom board ID and add support for it in source while stripping out a lot of the support for other boards that comes from the eewiki patches (basically, cherry pick those patches).
+
 ## Scripting Bring-up
 
 - Might be easier to use an external I2C programmer to set up the EEPROM first and then use mainline u-boot (nope - the I2C0 bus isn't broken out on testpoints or headers).

@@ -1,4 +1,4 @@
-# Where does the vector table come from?
+# Where does the AVR vector table come from?
 
 TL;DR: `avr-libc/crt1/gcrt1.S`
 
@@ -11,7 +11,8 @@ For example, the relocation `R_AVR_LDI` has number 19 (which is what is stored i
 
 The actual vector table is defined in `avr-libc-1.8.1/crt1/gcrt1.S`. The section `.vectors` is created and a global label `__vectors` is defined in it. Each entry that follows uses the `vector` macro defined in this file:
 
-```avr-asm
+
+```gas
 .macro	vector name
 .if (. - __vectors < _VECTORS_SIZE)
 .weak	\name
@@ -21,9 +22,12 @@ XJMP	\name
 .endm
 ```
 
+<!-- NOTE: I need to add support for mako tags into my pipeline so that I can add functions to generate flash boxes, add octicons, etc. Right now I'm just going to use this ugly HTML chunk below. One side-effect of this is I can't use markdown *inside* this block. Damn. -->
+<div class="flash mb-3"><svg aria-hidden="true" class="octicon octicon-alert mr-2" height="16" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M15.98 7.83l-.97-5.95C14.84.5 13.13 0 12 0H5.69c-.2 0-.38.05-.53.14L3.72 1H2C.94 1 0 1.94 0 3v4c0 1.06.94 2.02 2 2h2c.91 0 1.39.45 2.39 1.55.91 1 .88 1.8.63 3.27-.08.5.06 1 .42 1.42.39.47.98.76 1.56.76 1.83 0 3-3.71 3-5.01l-.02-.98h2.04c1.16 0 1.95-.8 1.98-1.97 0-.11-.02-.21-.02-.21zm-1.97 1.19h-1.99c-.7 0-1.03.28-1.03.97l.03 1.03c0 1.27-1.17 4-2 4-.5 0-1.08-.5-1-1 .25-1.58.34-2.78-.89-4.14C6.11 8.75 5.36 8 4 8V2l1.67-1H12c.73 0 1.95.31 2 1l.02.02 1 6c-.03.64-.38 1-1 1h-.01z"></path></svg>The Pygments <code>lexers.asm.GasLexer</code> doesn't support the macro family of syntax so the backslash above is marked as invalid. I may consider submitting a patch for better gas support in the <a href="https://bitbucket.org/birkenfeld/pygments-main/src/default/pygments/lexers/asm.py">lexer</a> if I get around to it.</div>
+
 And is used like this:
 
-```avr-asm
+```gas
 	.section .vectors,"ax",@progbits
 	.global	__vectors
 	.func	__vectors
