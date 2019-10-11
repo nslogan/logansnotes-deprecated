@@ -101,6 +101,8 @@ There's also a write protect mechanism for the EEPROM (section 6.3.2 in the [OSD
 
 Woo! That worked too.
 
+**Update:** The WP pin is tied to AM335x pin `GPMC_BEN0_CLE` which has alternate function `gpio2_5` which means that the EEPROM write protection can be disabled from u-boot with the command `gpio clear 69` (GPIO number calculated with `<bank> * 32 + <offset>` where `<offset>` is between 0 and 31).
+
 I'm going to try normal PocketBeagle u-boot image now (not hard-coded to PB selection). I'm going to also add in UMS while I'm rebuilding and uploading. That should make the eMMC process easier, hopefully.
 
 Normal u-boot works again with EEPROM programmed!
@@ -209,3 +211,28 @@ I'm going to create a custom board ID and add support for it in source while str
 - Might be easier to use an external I2C programmer to set up the EEPROM first and then use mainline u-boot (nope - the I2C0 bus isn't broken out on testpoints or headers).
 
 [This gist](https://gist.github.com/jadonk/809337ed8435cdc25f99887746550ed2#file-pb-tester-js) has what appears to be a node.js test script to automate u-boot stuff. Could be useful.
+
+## ImpossiBeagle
+
+Board ID: 
+
+Problem: I would like to not have to communicate with the PB via serial - I just want to see that it's working (much easier). To do this, I need to script the entire bring-up process and add support into u-boot for blank boards. This isn't hard, RCN already has "assume it's BBLN" patches out there. What's slightly harder is that I would like to write a custom serial number into the board (future work).
+
+Ok, here's another way:
+
+- Assume the device is an ImpossiBeagle and program it as such but don't set the serial number
+- The boot script will check if it's blank and then run the eeprom_program script if it is
+- Once it's programmed it will reset and then check that the S/N is programmed - If it's not it will call `loadx` and wait for a script over serial using x-modem; the script will contain the command to program the serial number
+- Once the file is received it will source it, programming the serial number into EEPROM
+- Once that's done it will call the ums command and wait to be programmed
+
+Neat, so I just did a basic test of that which starts UMS mode
+
+- https://www.denx.de/wiki/DULG/UBootScripts
+- host: `mkimage -T script -C none -n 'Demo Script File' -d setenv-commands setenv.img`
+- target: `loadx`
+- target: `source`
+
+Ok, so it's not worthwhile right now to focus on making our in-house u-boot support booting resin properly - I'd have to work with Auterion with this and they intend to drop Balena anyway. So, focus on making u-boot get to ums as the boot method.
+
+`CONFIG_NETCONSOLE` is not set but could be useful as a replacement for serial (saves a bunch of serial connections and code - use only USB)

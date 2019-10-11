@@ -1,4 +1,8 @@
 
+#### NXP MIMXRT1064-EVK
+
+[Zephyr](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/boards/arm/mimxrt1064_evk/doc/index.html) supports it - could be useful for scripts, configuration, etc.
+
 ### Register Class
 
 I've been dreaming of a "register" class implementation for a long time. The magic of templates, C++ classes, and embedded - wonderful.
@@ -742,6 +746,13 @@ There are a number of files generated whenever Kconfig / Kbuild runs:
 - `include/generated/autoconf.h`
 - `include/config/auto.conf`
 
+I found some resources while trying to figure out how a certain configuration made it into a u-boot build (I'm now wondering if it was by accident). I wanted to know what the default choice was for a `choice` entry - it seems to be whatever the first menu entry is (which [this line in kconfiglib.py seems to confirm](https://github.com/ulfalizer/Kconfiglib/blob/master/kconfiglib.py#L5306)).
+
+- [Kconfiglib - Python Kconfig implementation](https://github.com/ulfalizer/Kconfiglib) - Good for scripting / analysis
+	+ [Examples](https://github.com/ulfalizer/Kconfiglib/tree/master/examples)
+- [Kconfig macro language](https://github.com/torvalds/linux/blob/master/Documentation/kbuild/kconfig-macro-language.rst)
+- [Zephyr Docs: Kconfig - Tips and Best Pratices](https://docs.zephyrproject.org/latest/guides/kconfig/index.html)
+
 ### Memory Models
 
 Probably the most relevant reading to start with is [Dealing with memory access ordering in complex embedded designs](https://www.embedded.com/print/4437925).
@@ -792,6 +803,42 @@ Tabs:
 
 - [Dotfiles documentation on GitHub](https://dotfiles.github.io/) - I want to start source controlling my Linux configuration so I can argue with people at bars about vim vs emacs, bash vs zsh, and other pointless things.
 - [thefuck](https://github.com/nvbn/thefuck) is a glorious command I'd like to install and use
+
+#### D-Bus
+
+D-Bus applications can export objects for other applications’ use. To start working with an object in another application, you need to know:
+
+- The bus name. This identifies which application you want to communicate with. You’ll usually identify applications by a well-known name, which is a dot-separated string starting with a reversed domain name, such as `org.freedesktop.NetworkManager` or `com.example.WordProcessor`.
+- The object path. Applications can export many objects - for instance, `example.com`’s word processor might provide an object representing the word processor application itself and an object for each document window opened, or it might also provide an object for each paragraph within a document.
+
+To identify which one you want to interact with, you use an object path, a slash-separated string resembling a filename. For instance, `example.com`’s word processor might provide an object at `/` representing the word processor itself, and objects at `/documents/123` and `/documents/345` representing opened document windows.
+
+```python
+# bus.get_object( <bus-name>, <object-path> )
+proxy = bus.get_object('org.freedesktop.NetworkManager',
+                       '/org/freedesktop/NetworkManager/Devices/eth0')
+# proxy is a dbus.proxies.ProxyObject
+```
+
+- https://dbus.freedesktop.org/doc/dbus-tutorial.html
+- https://www.freedesktop.org/wiki/Software/dbus/
+- https://en.wikipedia.org/wiki/D-Bus
+- https://www.programcreek.com/python/example/1862/dbus.Interface
+- https://github.com/LEW21/pydbus
+- https://dbus.freedesktop.org/doc/dbus-python/dbus.html
+- https://dbus.freedesktop.org/doc/dbus-python/tutorial.html
+- https://gist.github.com/aursu/bcba7dde060469a18b865c306096f666
+- https://linux.die.net/man/1/dbus-send
+- https://www.freedesktop.org/software/ModemManager/api/latest/ModemManager-Flags-and-Enumerations.html#MMModemState
+- https://github.com/openshine/ModemManager/blob/master/test/list-modems.py
+- https://chromium.googlesource.com/chromiumos/platform/flimflam/+/0.12.369.B/test/mm.py
+- https://www.freedesktop.org/software/ModemManager/api/1.0.0/ch12.html
+- https://www.freedesktop.org/software/ModemManager/api/1.0.0/gdbus-org.freedesktop.ModemManager1.Modem.html
+- https://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-objectmanager
+- https://www.freedesktop.org/software/ModemManager/api/latest/ref-dbus-object-modem.html
+- https://www.freedesktop.org/software/ModemManager/api/latest/gdbus-org.freedesktop.ModemManager1.Modem.Simple.html
+- https://dbus.freedesktop.org/doc/dbus-specification.html#standard-interfaces-properties
+- https://www.freedesktop.org/software/ModemManager/api/1.0.0/ModemManager-Flags-and-Enumerations.html
 
 #### Spotify and hidpi
 
@@ -868,6 +915,11 @@ It should be noted that I'm fully reinventing the wheel here. I'm writing a "sta
 
 Right now I'm using [commonmarker](https://github.com/gjtorikian/commonmarker) which is a Ruby wrapper for [libcmark-gfm](https://github.com/github/cmark-gfm), GitHub's fork of the reference parser for CommonMark. However, I don't see any reason to keep using this when there's a Python wrapper that does the same thing - [cmarkgfm](https://github.com/theacodes/cmarkgfm). I haven't tried it out yet but I will and hopefully it's just as easy to use. I don't know Ruby right now and don't plan to learn it for this project. Additionally, a number of other tools I plan to use are Python-base so this would make the pipeline slightly less complicated. [Here's](https://github.com/github/markup) a description of GitHub's markdown rendering pipeline.
 
+#### Pre-Processor
+
+- https://github.com/commenthol/markedpp/tree/master/src
+- https://github.com/jreese/markdown-pp/blob/master/MarkdownPP/Processor.py
+
 #### Syntax Highlighting
 
 Since I was already using commonmarker I also used [pygments.rb](https://github.com/tmm1/pygments.rb), a Ruby wrapper for Python [pygments](http://pygments.org/) syntax highlighter. I'm going to switch to using the Python version without Ruby for the same reason listed earlier.
@@ -918,6 +970,11 @@ So it turns out GitHub has open-sourced their entire CSS framework - that's supe
 The framework is called [Primer](https://primer.style/). Here's the [Primer CSS Getting started guide](https://primer.style/css/getting-started). I did a quick test by just downloading the compiled CSS and it works great. I'll have to read up on how to structure the site but it looks super easy and will give me mobile compatibility like I wanted (I'm pretty sure).
 
 I can also still use `grip` to easily inspect a rendered Markdown document and its associated styles.
+
+#### Style Examples
+
+- I really like [Eli Bendersky's website](https://eli.thegreenplace.net/2015/redirecting-all-kinds-of-stdout-in-python/)
+- [GitBook](https://docs.gitbook.com/integrations/github/limitations) also has some good design elements
 
 #### Terminal Color Capture
 

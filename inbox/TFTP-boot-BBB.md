@@ -157,6 +157,22 @@ enable-tftp
 tftp-root=/var/lib/tftpboot
 dhcp-boot=beagle.img
 
+# Alternative configuration
+dhcp-vendorclass=set:am335x_rom,AM335x ROM
+dhcp-vendorclass=set:am335x_spl,AM335x U-Boot SPL
+
+port=0
+interface=enp0s20f0u2u4u3
+interface=usb0
+dhcp-range=192.168.2.50,192.168.2.150,12h
+bootp-dynamic
+enable-tftp
+#tftp-secure
+tftp-root=/var/lib/tftpboot
+dhcp-boot=net:am335x_spl,u-boot.img
+dhcp-boot=net:am335x_rom,u-boot-spl.bin
+
+
 # Restart the dnsmasq service after changing the configuration
 $ sudo systemctl restart dnsmasq
 

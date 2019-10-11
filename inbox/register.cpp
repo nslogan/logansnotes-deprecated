@@ -60,8 +60,40 @@ struct Register {
 // 
 // // But this would be dope:
 // PINA.SetBit( PINA::PINA7 );
+// // or:
+// PINA.SetBit( PINA::PIN7 )
+// // or:
+// PINA.SetBit( PIN7 )
+// // Since it's probably unnecessary to declare PIN<BANK><NUMBER> for all BANKs
 // 
 // Maybe there's something clever (oh shit, there it is again) by defining a more complex type for the masks, another template or something, so that you can specify the field (multi-bit value) and the value to assign and it will handle the shift and mask operation, type checking, etc.
+// 
+// It's also important to consider that these register offsets are often multi-level - for example, consider this define set
+// 
+// #define GPIO_PORT_A_BASE		(PERIPH_BASE_AHB1 + 0x0000)
+// #define PERIPH_BASE			(0x40000000U)
+// #define PERIPH_BASE_AHB1		(PERIPH_BASE + 0x20000)
+// 
+// So it might be good to be able to build register sets upon one another. Maybe have a RegisterBase type that just has an address but no actions; if you build upon it your register adds its offset to it to calculate the address. I'm not actually sure how to structure that but it seems cleaner than hiding it in a bunch of defines. The better option, IMO, would be to use the exact peripheral offset instead.
+// 
+// RegisterBase<uint32_t,0x40000000U> PERIPH_BASE;
+// RegisterBase<PERIPH_BASE,0x20000> PERIPH_BASE_AHB1;
+// RegisterBase<PERIPH_BASE_AHB1,0x0000> GPIO_PORT_A_BASE;
+// Register<GPIO_PORT_A_BASE,0x0> GPIOA_MODER;
+// 
+// I guess in this case the children would inherit the register width? I'm not sure if it makes sense to have the register width in the parent or not.
+// This could potentially even be used to enforce access types (e.g. "device" and "strongly ordered" types, insert memory barriers, etc.).
+// 
+// Is there a way to use this class in a slightly more generic way? Say you want to provide a "SPI" register template that can apply to SPI[1:6] but the specific instance is stored in a pointer instead of access directly?
+// This way lines like:
+// 
+// setbits_le32(priv->base + STM32_SPI_IFCR, SPI_IFCR_ALL);
+// 
+// Can become:
+// 
+// SPI_IFCR.SetBits( priv->base, SPI_IFCR_ALL )
+// 
+// (or some cleaner looking version where you don't need the `priv->base` in each function somehow)
 
 int main()
 {
