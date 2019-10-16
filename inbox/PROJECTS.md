@@ -924,7 +924,7 @@ Right now I'm using [commonmarker](https://github.com/gjtorikian/commonmarker) w
 
 Since I was already using commonmarker I also used [pygments.rb](https://github.com/tmm1/pygments.rb), a Ruby wrapper for Python [pygments](http://pygments.org/) syntax highlighter. I'm going to switch to using the Python version without Ruby for the same reason listed earlier.
 
-There are lexers available for assembly languages, including [gas](http://pygments.org/docs/lexers/#lexers-for-assembly-languages) (and it looks like some for objdump, will revisit that as well).
+There are lexers available for assembly languages, including [gas](http://pygments.org/docs/lexers/#lexers-for-assembly-languages) (and it looks like some for objdump, will revisit that as well). The gas lexer doesn't support the full [syntax](https://sourceware.org/binutils/docs/as/Macro.html#Macro), however.
 
 It'd be neat if my source code highlighter had options like GitHub's source code viewer (though that is specific to viewing a file):
 

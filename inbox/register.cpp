@@ -1,7 +1,10 @@
 
 #include <cstdint>
+#include <stdio.h>
 
 using std::uint32_t;
+
+// I need to consider how I could switch out "real" register classes (for use on an embedded device) for a "fake" class that can be used in unit testing, host-compiled binaries, etc. - these could be used to tie into a simulated address space, print debugging messages etc. Are templates a way to do this? Or just a whole "fake register" class template?
 
 // Hmm. Which constant type is correct for the address? Maybe I use the type T (?). Or maybe size_t (?). This should always (?) be the size of the memory architecture (I think) - so 8 (AVR) or [32,64] (ARM)
 // TODO: Better name than `address`
@@ -25,7 +28,8 @@ struct Register {
 	{
 		// TODO: Handle conversion of different size data (e.g. uint8_t) to the register width (?)
 		// TODO: Is there a way to do this same operation, like, a lot? I want to override all operators on this value (e.g. |=, &=, etc.) and this just seems obnoxious
-		(*reinterpret_cast<pointer>(address)) = val;
+		// (*reinterpret_cast<pointer>(address)) = val;
+		printf( "Write to 0x%08X with value 0x%08x\n", address, val );
 	}
 
 	// Mkay, what other operations do we need?
@@ -101,3 +105,22 @@ int main()
 
 	CM_PER_GPIO1_CLKCTRL = 0x40002;
 }
+
+// Is there a way to declare registers like I have above but *also* be able to reference them via pointers / references?
+//
+// For example, I'd like to do:
+// 
+// Register<uint32_t,ADDRESS> REG_INSTANCE;
+// 
+// And then be able to do:
+// 
+// Register<uint32_t> *inst = REG_INSTANCE;
+// *inst = VALUE;
+// 
+// Or is it better to do stuff like pass around register base addresses (or the offset or something through a template) and inside of functions do stuff like:
+// 
+// void device::do_something( device_t * priv )
+// {
+// 	Register<uint32_t,priv->base_addr> inst;
+// 	inst = VALUE;
+// }
