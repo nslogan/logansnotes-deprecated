@@ -99,11 +99,68 @@ struct Register {
 // 
 // (or some cleaner looking version where you don't need the `priv->base` in each function somehow)
 
-int main()
-{
-	Register<uint32_t,0x44e000AC> CM_PER_GPIO1_CLKCTRL;
+// I think the goal of the "pointer-based" solution would be to still compile things like:
+// 
+// // Declared: priv = Register(pointer);
+// priv.REG.SetBit( BIT )
+// 
+// To:
+// 
+// *(base + offset) |= BIT;
+// 
+// Not to a function call that does that. The question is how to do that...
+// Like, if the template class is all static methods and the only variable it stores is the base address (as a value or a pointer) then in theory I think the methods should all get inlined...
 
-	CM_PER_GPIO1_CLKCTRL = 0x40002;
+template<typename T>
+struct RegisterRef {
+	RegisterRef( T addr ) : addr_(addr) {}
+
+	typedef volatile T * pointer;
+
+	// TODO: Probably need a version without const?
+	// TODO: Replace with typedef for const value
+	void operator= ( const T val )
+	{
+		// TODO: Handle conversion of different size data (e.g. uint8_t) to the register width (?)
+		// TODO: Is there a way to do this same operation, like, a lot? I want to override all operators on this value (e.g. |=, &=, etc.) and this just seems obnoxious
+		(*reinterpret_cast<pointer>(addr_)) = val;
+	}
+
+	// Mkay, what other operations do we need?
+	// - Return value (other side of assignment)
+	// - Other operator overloads: |= &= += -= == (?)
+	// - Could provide facilities for access permissions (like that one paper) - e.g. read only, write only, read/write
+	// - Could also use these same facilities to provide proper handling of "unused" bits of a register (e.g. where they need to always be set to 1 or 0); this has some static and dynamic cost implications (const input value + const mask = compile-time calculation; non-const input (e.g. variable) + const mask = dynamic calculation)
+	// bit_set, bit_clear, bit_flip, bit_check
+private:
+	T addr_;
+};
+
+static void do_stuff( RegisterRef<uint32_t> & ref )
+{
+	// RegisterRef<uint32_t> REF_CM_PER_GPIO1_CLKCTRL = RegisterRef<uint32_t>(base);
+	// REF_CM_PER_GPIO1_CLKCTRL = 0x40002;
+	ref = 0x40002;
+}
+
+void main()
+{
+	// Absolute register reference (static)
+	// Register<uint32_t,0x44e000AC> CM_PER_GPIO1_CLKCTRL;
+	// CM_PER_GPIO1_CLKCTRL = 0x40002;
+
+	// Pointer-based register reference (variable-based address)
+	// uint32_t base = 0x44e000AC;
+	// RegisterRef<uint32_t> REF_CM_PER_GPIO1_CLKCTRL = RegisterRef<uint32_t>(base);
+	// REF_CM_PER_GPIO1_CLKCTRL = 0x40002;
+	
+	RegisterRef<uint32_t> REF_CM_PER_GPIO1_CLKCTRL_1 = RegisterRef<uint32_t>(0x44e000AC);
+	RegisterRef<uint32_t> REF_CM_PER_GPIO1_CLKCTRL_2 = RegisterRef<uint32_t>(0x44e000BC);
+
+	do_stuff( REF_CM_PER_GPIO1_CLKCTRL_1 );
+	do_stuff( REF_CM_PER_GPIO1_CLKCTRL_2 );
+
+	while(1);
 }
 
 // Is there a way to declare registers like I have above but *also* be able to reference them via pointers / references?
