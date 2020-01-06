@@ -269,6 +269,9 @@ $ st-flash write bin/blink.bin 0x8000000
 
 The file [`<px4-firmware>/boards/px4/fmu-v5/nuttx-config/scripts/script.ld`](https://github.com/PX4/Firmware/blob/master/boards/px4/fmu-v5/nuttx-config/scripts/script.ld) is a very well documented linker script for the STM32F7.
 
+- https://www.stmicroelectronics.com.cn/content/ccc/resource/technical/document/application_note/group0/91/01/84/3f/7c/67/41/3f/DM00236305/files/DM00236305.pdf/jcr:content/translations/en.DM00236305.pdf
+- https://vivonomicon.com/2019/07/05/bare-metal-stm32-programming-part-9-dma-megamix/
+
 #### Toolchain
 
 - I should really take a look at [crosstool-NG](https://crosstool-ng.github.io/)
@@ -289,6 +292,76 @@ There's even more awesome information in [Guide to Bare Metal Programming with G
 #### Startup
 
 [Here's](https://github.com/arobenko/embxx_on_rpi/blob/master/src/raspberrypi.ld) an example of a linker script for the RaspberryPi. And [here's](https://github.com/arobenko/embxx_on_rpi/blob/master/src/asm/startup.s) the matching startup code for that same implementation.
+
+#### Hard Faults, GDB
+
+- https://mcuoneclipse.com/2015/07/05/debugging-arm-cortex-m-hard-faults-with-gdb-custom-command/
+- https://gist.github.com/tralamazza/294e45475fce0b8e6c63
+- https://doar-e.github.io/blog/2014/04/30/corrupting-arm-evt/
+- https://www.element14.com/community/thread/54959/l/gdb-assisted-debugging-of-hard-faults?displayFullThread=true
+- https://github.com/simonjwright/cortex-gnat-rts/wiki/HardFaultHandling
+- http://www.keil.com/appnotes/files/apnt209.pdf
+- https://rhye.org/post/stm32-with-opencm3-5-fault-handlers/
+- http://www.keil.com/support/man/docs/armasm/armasm_dom1361289865326.htm
+- https://stackoverflow.com/questions/16081618/programmatically-cause-undefined-instruction-exception
+- https://mcuoneclipse.com/2012/11/24/debugging-hard-faults-on-arm-cortex-m/
+
+#### Boot Options
+
+##### 3.4 FLASH Option bytes (pg. 99)
+
+These are programmed by ST and are read only
+
+User and write protection option bytes
+addr: 0x1FFF0008
+ST programmed value: 0x0000FFFF
+
+Bit 13 nDBANK = 1
+
+1: The Flash user area is seen as a single bank with 256 bits read access.
+0: The Flash user area is seen as a dual bank with 128 bits read access (dual bank mode
+feature active)
+
+###### Boot address option bytes when Boot pin = 0
+
+addr: 0x1FFF0010
+ST programmed value: 0xFF7F0080
+
+BOOT_ADD0[15:0] correspond to address [29:14],
+The boot base address supports address range only from 0x0000 0000 to 0x2004 FFFF
+with a granularity of 16KB.
+Example:
+BOOT_ADD0 = 0x0000: Boot from ITCM RAM (0x0000 0000)
+BOOT_ADD0 = 0x0040: Boot from system memory bootloader (0x0010 0000)
+BOOT_ADD0 = 0x0080: Boot from Flash on ITCM interface (0x0020 0000)
+BOOT_ADD0 = 0x2000: Boot from Flash on AXIM interface (0x0800 0000)
+BOOT_ADD0 = 0x8000: Boot from DTCM RAM (0x2000 0000)
+BOOT_ADD0 = 0x8004: Boot from SRAM1 (0x2002 0000)
+BOOT_ADD0 = 0x8013: Boot from SRAM2 (0x2004 C000)
+
+=> BOOT_ADD0 = 0x0080: Boot from Flash on ITCM interface (0x0020 0000)
+
+###### Boot address option bytes when Boot pin = 1
+
+addr: 0x1FFF0018
+ST programmed value: 0xFFBF0040
+
+BOOT_ADD1[15:0]: Boot memory base address when Boot pin =1
+BOOT_ADD1[15:0] correspond to address [29:14],
+The boot base address supports address range only from 0x0000 0000 to 0x2004 FFFF
+with a granularity of 16KB.
+Example:
+BOOT_ADD1 = 0x0000: Boot from ITCM RAM(0x0000 0000)
+BOOT_ADD1 = 0x0040: Boot from system memory bootloader (0x0010 0000)
+BOOT_ADD1 = 0x0080: Boot from Flash on ITCM interface (0x0020 0000)
+BOOT_ADD1 = 0x2000: Boot from Flash on AXIM interface (0x0800 0000)
+BOOT_ADD1 = 0x8000: Boot from DTCM RAM (0x2000 0000)
+BOOT_ADD1 = 0x8004: Boot from SRAM1 (0x2002 0000)
+BOOT_ADD1 = 0x8013: Boot from SRAM2 (0x2004 C000)
+
+=> BOOT_ADD1 = 0x0040: Boot
+
+##### 3.7 FLASH registers
 
 ### STM32 u-boot
 
